@@ -774,13 +774,30 @@ export class ClaudeProcessManager extends EventEmitter {
         stderr: 'pipe'
       });
       
+      // Check if we're dealing with a symlink to a .js file and use node directly
+      let spawnCommand = executablePath;
+      let spawnArgs = args;
+      
+      // If the executable is a .js file or symlinks to one, use node directly
+      if (executablePath.endsWith('.js') || (existsSync(executablePath) && readFileSync(executablePath, 'utf8').startsWith('#!/usr/bin/env node'))) {
+        spawnCommand = process.execPath; // Use the current Node.js executable
+        spawnArgs = [executablePath, ...args];
+        this.logger.debug('Using Node.js directly to execute Claude CLI', {
+          streamingId,
+          nodeExecutable: spawnCommand,
+          claudeScript: executablePath,
+          finalArgs: spawnArgs
+        });
+      }
+      
       // Log the exact command for debugging
-      const fullCommand = `${executablePath} ${args.join(' ')}`;
+      const fullCommand = `${spawnCommand} ${spawnArgs.join(' ')}`;
       this.logger.debug('SPAWNING CLAUDE COMMAND: ' + fullCommand, { 
         streamingId,
         fullCommand,
-        executablePath,
-        args,
+        spawnCommand,
+        spawnArgs,
+        originalExecutablePath: executablePath,
         cwd,
         env: Object.entries(env).reduce((acc, [key, value]) => {
           acc[key] = value;
@@ -788,7 +805,7 @@ export class ClaudeProcessManager extends EventEmitter {
         }, {} as Record<string, string | undefined>)
       });
       
-      const claudeProcess = spawn(executablePath, args, {
+      const claudeProcess = spawn(spawnCommand, spawnArgs, {
         cwd,
         env,
         stdio: ['inherit', 'pipe', 'pipe'] // stdin inherited, stdout/stderr piped for capture
@@ -808,7 +825,8 @@ export class ClaudeProcessManager extends EventEmitter {
         if (error.code === 'ENOENT') {
           this.logger.error('Claude executable not found', {
             streamingId,
-            attemptedPath: executablePath,
+            attemptedPath: spawnCommand,
+            originalExecutablePath: executablePath,
             PATH: env.PATH
           });
           this.emit('spawn-error', new CUIError('CLAUDE_NOT_FOUND', 'Claude CLI not found. Please ensure Claude is installed and in PATH.', 500));
