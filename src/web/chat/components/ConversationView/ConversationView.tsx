@@ -215,63 +215,6 @@ export function ConversationView() {
 
   return (
     <div className="h-full flex flex-col bg-background relative" role="main" aria-label="Conversation view">
-      <ConversationHeader 
-        title={conversationSummary?.sessionInfo.custom_name || conversationTitle}
-        sessionId={sessionId}
-        isArchived={conversationSummary?.sessionInfo.archived || false}
-        isPinned={conversationSummary?.sessionInfo.pinned || false}
-        subtitle={conversationSummary ? {
-          date: new Date(conversationSummary.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          repo: conversationSummary.projectPath.split('/').pop() || 'project',
-          commitSHA: conversationSummary.sessionInfo.initial_commit_head,
-          changes: conversationSummary.toolMetrics ? {
-            additions: conversationSummary.toolMetrics.linesAdded,
-            deletions: conversationSummary.toolMetrics.linesRemoved
-          } : undefined
-        } : undefined}
-        onTitleUpdate={async (newTitle) => {
-          // Update local state immediately for instant feedback
-          setConversationTitle(newTitle);
-          
-          // Update the conversation summary with the new custom name
-          if (conversationSummary) {
-            setConversationSummary({
-              ...conversationSummary,
-              sessionInfo: {
-                ...conversationSummary.sessionInfo,
-                custom_name: newTitle
-              }
-            });
-          }
-          
-          // Optionally refresh from backend to ensure consistency
-          try {
-            const conversationsResponse = await api.getConversations({ limit: 100 });
-            const updatedConversation = conversationsResponse.conversations.find(
-              conv => conv.sessionId === sessionId
-            );
-            if (updatedConversation) {
-              setConversationSummary(updatedConversation);
-              const title = updatedConversation.sessionInfo.custom_name || updatedConversation.summary || 'Untitled';
-              setConversationTitle(title);
-            }
-          } catch (error) {
-            console.error('Failed to refresh conversation after rename:', error);
-          }
-        }}
-        onPinToggle={async (isPinned) => {
-          if (conversationSummary) {
-            setConversationSummary({
-              ...conversationSummary,
-              sessionInfo: {
-                ...conversationSummary.sessionInfo,
-                pinned: isPinned
-              }
-            });
-          }
-        }}
-      />
-      
       {error && (
         <div 
           className="bg-red-500/10 border-b border-red-500 text-red-600 dark:text-red-400 px-4 py-2 text-sm text-center animate-in slide-in-from-top duration-300"
